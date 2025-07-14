@@ -12,13 +12,6 @@ public class UIViewBase : MonoBehaviour
     }
     protected void BtnClick(GameObject gameObject)
     {
-        if (!gameObject.name.Equals("BtnSkill1", StringComparison.CurrentCultureIgnoreCase)
-            && !gameObject.name.Equals("BtnSkill2", StringComparison.CurrentCultureIgnoreCase)
-            && !gameObject.name.Equals("BtnSkill3", StringComparison.CurrentCultureIgnoreCase)
-            && !gameObject.name.Equals("BtnAddHP", StringComparison.CurrentCultureIgnoreCase))
-        {
-            //AudioEffectMgr.Instance.PlayUIAudioEffect(UIAudioEffectType.ButtonClick);
-        }
         OnBtnClick(gameObject);
     }
     public void Start()

@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
-namespace Assets.Script.Controller
+public class CustomizedController : SystemCtrlBase<DialogueController>, ISystemCtrl
 {
-    class CustomizedController
+    public WindowUIType UIType => WindowUIType.CustomWindow;
+
+    public void OpenView(WindowUIType type)
     {
+
     }
 }

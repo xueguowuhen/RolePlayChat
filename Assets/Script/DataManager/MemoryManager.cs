@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 using UnityEngine;
 
 
-public class MemoryManager : MonoBehaviour
+public class MemoryManager : MonoBehaviour, IInitializable, IMemoryManager
 {
     public static MemoryManager Instance { get; private set; }
     //系统规则
@@ -44,7 +44,7 @@ public class MemoryManager : MonoBehaviour
     private readonly int _batchSize = 10; // 每累计10条对话触发一次批处理
     #region Lifecycle Management
 
-    public void Init()
+    public void Initialize()
     {
         if (Instance != null && Instance != this)
         {
@@ -53,7 +53,7 @@ public class MemoryManager : MonoBehaviour
         }
 
         Instance = this;
-        _encoder = GameRoot.Instance.SentisInference;
+        _encoder = ServiceLocator.Container.GetService<SentisInference>();
         DontDestroyOnLoad(gameObject);
         InitializeMemorySystem();
     }
@@ -75,20 +75,10 @@ public class MemoryManager : MonoBehaviour
 
     private void InitializeMemorySystem()
     {
-        _memoryData = DataPersistenceManager.Instance.GetCurrentMemory() ?? CreateNewMemoryData();
+        _memoryData = ServiceLocator.Container.GetService<DataPersistenceManager>().GetCurrentMemory();
 
 
     }
-
-    private MemoryData CreateNewMemoryData()
-    {
-        return new MemoryData
-        {
-            shortTermCapacity = shortTermMemoryCapacity,
-            importanceThreshold = longTermThreshold
-        };
-    }
-
     #endregion
 
     #region Public API - Memory Operations
@@ -133,7 +123,7 @@ public class MemoryManager : MonoBehaviour
 
         // 2. 将内容拼接，调用外部摘要接口（LLM）生成摘要 JSON
         string combined = string.Join("\n", batch);
-        string summaryJson=""; //= LlmService.GenerateSummaryWithWeights(combined);
+        string summaryJson = ""; //= LlmService.GenerateSummaryWithWeights(combined);
 
         // 3. 解析摘要结果：[{ theme, summary, weight }]
         var items = JsonConvert.DeserializeObject<List<SummaryItem>>(summaryJson);
@@ -165,8 +155,6 @@ public class MemoryManager : MonoBehaviour
     }
     public void AddDialogue(string content, float importance, Role role)
     {
-
-        
         var newRecord = new MemoryRecord(content, role, null, MemoryType.ShortTerm, importance);
 
         // 2. 添加到短期记忆
@@ -392,7 +380,7 @@ public class MemoryManager : MonoBehaviour
     private void SaveMemoryState()
     {
         DataPersistenceManager.Instance.SaveData(
-            GameRoot.Instance.dialogueController.GetModel(),
+            ServiceLocator.Container.GetService<DialogueController>().GetModel(),
             null,
             _memoryData
         );
@@ -405,28 +393,28 @@ public class MemoryManager : MonoBehaviour
     [Header("Debug Tools")]
     public bool debugMode = false;
 
-    private void OnGUI()
-    {
-        if (!debugMode) return;
+    //private void OnGUI()
+    //{
+    //    if (!debugMode) return;
 
-        GUILayout.BeginArea(new Rect(10, 10, 300, 500));
-        GUILayout.Label("=== Memory Manager Debug ===");
+    //    GUILayout.BeginArea(new Rect(10, 10, 300, 500));
+    //    GUILayout.Label("=== Memory Manager Debug ===");
 
-        GUILayout.Label($"Short Term: {_memoryData.shortTermMemory.Count}/{shortTermMemoryCapacity}");
-        foreach (var memory in _memoryData.shortTermMemory)
-        {
-            GUILayout.Label($"- {memory.content.Substring(0, Math.Min(30, memory.content.Length))} ({memory.importance:F2})");
-        }
+    //    GUILayout.Label($"Short Term: {_memoryData.shortTermMemory.Count}/{shortTermMemoryCapacity}");
+    //    foreach (var memory in _memoryData.shortTermMemory)
+    //    {
+    //        GUILayout.Label($"- {memory.content.Substring(0, Math.Min(30, memory.content.Length))} ({memory.importance:F2})");
+    //    }
 
-        GUILayout.Space(10);
-        GUILayout.Label($"Long Term: {_memoryData.longTermMemory.Count}/{longTermMemoryCapacity}");
-        foreach (var memory in _memoryData.longTermMemory.OrderByDescending(m => m.importance).Take(5))
-        {
-            GUILayout.Label($"- {memory.content.Substring(0, Math.Min(30, memory.content.Length))} ({memory.importance:F2})");
-        }
+    //    GUILayout.Space(10);
+    //    GUILayout.Label($"Long Term: {_memoryData.longTermMemory.Count}/{longTermMemoryCapacity}");
+    //    foreach (var memory in _memoryData.longTermMemory.OrderByDescending(m => m.importance).Take(5))
+    //    {
+    //        GUILayout.Label($"- {memory.content.Substring(0, Math.Min(30, memory.content.Length))} ({memory.importance:F2})");
+    //    }
 
-        GUILayout.EndArea();
-    }
+    //    GUILayout.EndArea();
+    //}
 
     #endregion
 }

@@ -1,100 +1,61 @@
-﻿using System.Collections;
-using System.Text;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
-public class ResourcesMgr : Singleton<ResourcesMgr>
+public class ResourcesMgr : IResourcesManager
 {
-    #region ResourceType 资源类型
-    /// <summary>
-    /// 资源类型
-    /// </summary>
-    public enum ResourceType
-    {
-        /// <summary>
-        /// 场景UI
-        /// </summary>
-        UIScene,
-        /// <summary>
-        /// 窗口
-        /// </summary>
-        UIWindows,
-        /// <summary>
-        /// 其他
-        /// </summary>
-        Other,
-        /// <summary>
-        /// 窗口子项
-        /// </summary>
-        UIWindowsChild,
-    }
-    #endregion
-    private Hashtable m_PrefabTable;
-    public ResourcesMgr()
-    {
-        m_PrefabTable = new Hashtable();
-    }
-    #region Load 加载资源
+    public enum ResourceType { UIScene, UIWindows, UIWindowsChild, Other }
 
-    /// <summary>
-    /// 加载资源
-    /// </summary>
-    /// <param name="type">资源类型</param>
-    /// <param name="path">短路径</param>
-    /// <param name="cache">是否放入缓存</param>
-    /// <param name="returnClone">是否返回克隆体</param>
-    /// <returns></returns>
-    public GameObject Load(ResourceType type, string path, bool cache = false, bool returnClone = true)
+    private readonly Dictionary<string, GameObject> _cache = new();
+    private readonly Dictionary<ResourceType, string> _basePaths = new()
     {
-        StringBuilder sbr = new StringBuilder();
-        GameObject obj = null;
+        { ResourceType.UIScene,       "UIPrefab/UIScence/" },
+        { ResourceType.UIWindows,     "UIPrefab/UIWindows/" },
+        { ResourceType.UIWindowsChild,"UIPrefab/UIWindowsChild/" },
+        { ResourceType.Other,         "UIPrefab/UIOther/" }
+    };
 
-        if (m_PrefabTable.Contains(path))
+    public GameObject LoadPrefab(string path, bool cache = false, bool returnInstance = true)
+    {
+        if (string.IsNullOrEmpty(path)) //path路径不存在
+            throw new ArgumentException("资源路径不能为空", nameof(path));
+
+        if (cache && _cache.TryGetValue(path, out var cached)) //如果存在该资源
+            return returnInstance ? Object.Instantiate(cached) : cached;
+
+        var type = DetectResourceType(path, out var shortPath); //不存在则加载并取出
+        var fullPath = _basePaths[type] + shortPath;
+
+        var prefab = Resources.Load<GameObject>(fullPath);
+        if (prefab == null)
+            throw new InvalidOperationException($"加载资源失败: {fullPath}");
+
+        if (cache)
+            _cache[path] = prefab;
+
+        return returnInstance ? Object.Instantiate(prefab) : prefab;
+    }
+
+    public void ClearCache()
+    {
+        _cache.Clear();
+        Resources.UnloadUnusedAssets();
+    }
+
+    private ResourceType DetectResourceType(string path, out string shortPath)
+    {
+        foreach (var kv in _basePaths)
         {
-            obj = m_PrefabTable[path] as GameObject;
-        }
-        else
-        {
-            switch (type)
+            var key = kv.Key + "/";
+            if (path.StartsWith(key, StringComparison.OrdinalIgnoreCase))
             {
-                case ResourceType.UIScene:
-                    sbr.Append("UIPrefab/UIScence/");
-                    break;
-                case ResourceType.UIWindows:
-                    sbr.Append("UIPrefab/UIWindows/");
-                    break;
-                case ResourceType.Other:
-                    sbr.Append("UIPrefab/UIOther/");
-                    break;
-                case ResourceType.UIWindowsChild:
-                    sbr.Append("UIPrefab/UIWindowsChild/");
-                    break;
+                shortPath = path.Substring(key.Length);
+                return kv.Key;
             }
-            sbr.Append(path);
-            obj = Resources.Load(sbr.ToString()) as GameObject;
-            if (cache)
-            {
-                m_PrefabTable.Add(path, obj);
-            }
-
         }
-        if (returnClone)
-        {
-            return Object.Instantiate(obj);
-
-        }
-        else
-        {
-            return obj;
-        }
-    }
-    #endregion
-    #region Dispose 释放资源
-    public override void Dispose()
-    {
-        base.Dispose();
-        m_PrefabTable.Clear();
-        Resources.UnloadUnusedAssets();//释放未使用的资源
+        shortPath = path;
+        return ResourceType.UIWindows;
     }
 
-    #endregion
 }

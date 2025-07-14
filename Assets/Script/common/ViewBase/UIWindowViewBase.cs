@@ -28,9 +28,12 @@ public class UIWindowViewBase : UIViewBase
     /// 下一个窗口
     /// </summary>
     private WindowUIType m_NextOpenType;
+
+    protected UIViewUtil uiView;
     protected override void OnAWake()
     {
         base.OnAWake();
+        uiView= ServiceLocator.Container.GetService<UIViewUtil>();
     }
     protected override void OnBtnClick(GameObject gameObject)
     {
@@ -45,8 +48,7 @@ public class UIWindowViewBase : UIViewBase
     /// </summary>
     public virtual void Close()
     {
-      //  AudioEffectMgr.Instance.PlayUIAudioEffect(UIAudioEffectType.UIClose);
-        UIViewUtil.Instance.CloseWindow(ViewName);
+        uiView.CloseWindow(ViewName);
     }
     /// <summary>
     /// 关闭并打开下一个窗口
@@ -55,17 +57,13 @@ public class UIWindowViewBase : UIViewBase
     {
         Close();
         m_NextOpenType = nextType;
-        //if (OnViewClose != null)
-        //{
-        //    OnViewClose(nextType);
-        //}
     }
     protected override void BeforeOnDestroy()
     {
         LayerUIMgr.Instance.CheckOpenWindow();
         if (m_NextOpenType != WindowUIType.None)
         {
-            UIViewMgr.Instance.OpenWindow(m_NextOpenType);
+            ServiceLocator.Container.GetService<UIViewMgr>().OpenWindow(m_NextOpenType);
         }
     }
 }
