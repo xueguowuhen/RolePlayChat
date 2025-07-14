@@ -23,7 +23,7 @@ public class LayerUIMgr : Singleton<LayerUIMgr>
     /// </summary>
     public void CheckOpenWindow()
     {
-        if (UIViewUtil.Instance.OpenWindowCount == 0)
+        if (ServiceLocator.Container.GetService<UIViewUtil>().OpenWindowCount == 0)
         {
             Reset();
         }

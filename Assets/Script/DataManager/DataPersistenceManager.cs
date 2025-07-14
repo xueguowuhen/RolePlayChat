@@ -9,7 +9,7 @@ using UnityEngine;
 /// DataPersistenceManager 负责将对话历史、用户设置、记忆等数据序列化到本地磁盘，
 /// 以及从本地磁盘读取并恢复到内存模型中。它采用单例模式，确保场景切换时不被销毁。
 /// </summary>
-public class DataPersistenceManager : MonoBehaviour
+public class DataPersistenceManager : MonoBehaviour, IInitializable, IDataPersistenceManager
 {
     /// <summary>
     /// 单例实例，可全局访问
@@ -40,7 +40,7 @@ public class DataPersistenceManager : MonoBehaviour
     private SettingData _currentSettings;
     private MemoryData _currentMemory;
     private int _randomSize;
-    public void Init()
+    public void Initialize()
     {
         // 单例模式
         if (Instance != null && Instance != this)

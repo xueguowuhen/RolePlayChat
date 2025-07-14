@@ -4,7 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-public interface ISystemCtrl
+
+public interface IUIViewMgr
 {
-    void OpenView(WindowUIType type);
+    public void OpenWindow(WindowUIType uiType);
 }
+

@@ -11,7 +11,7 @@ using UnityEngine;
 /// SentisInference 负责加载并运行一个 ONNX 文本模型，将文本转换为向量（Embedding），
 /// 并提供单句和对话级别的向量化接口，以及相似度计算方法。
 /// </summary>
-public partial class SentisInference : MonoBehaviour
+public partial class SentisInference : IInitializable,ISentisInference
 {
     // -------------------- 配置字段 --------------------
 
@@ -33,11 +33,13 @@ public partial class SentisInference : MonoBehaviour
 
     private const int MAX_SEQ_LENGTH = 512; // 模型支持的最大 token 序列长度
     private const int PAD_ID = 0;           // 填充时使用的 token id，一般对应 [PAD]
+
+
     /// <summary>
     /// Start 在 Awake 后运行，仅执行一次。
     /// 负责加载 ONNX 模型，创建推理执行器，并触发测试方法。
     /// </summary>
-    public void Init()
+    public void Initialize()
     {
         // 1. 从 StreamingAssets 加载词表文件路径
         string vocabPath = Path.Combine(Application.streamingAssetsPath, "gte-base-zh/vocab.txt");
@@ -61,49 +63,6 @@ public partial class SentisInference : MonoBehaviour
         // 4. 运行内部测试示例
         // RunTestTexts();
     }
-
-    // -------------------- 测试示例 --------------------
-
-    /// <summary>
-    /// RunTestTexts 演示如何调用单句编码和对话编码，以及相似度计算。
-    /// </summary>
-    //public void RunTestTexts()
-    //{
-    //    try
-    //    {
-    //        // 准备一组示例文本
-    //        var texts = new Dictionary<string, string>()
-    //        {
-    //            {"文本1", "今天天气很好，我出门玩了"},
-    //            {"文本2", "昨日NBA总决赛，湖人队获得总冠军"},
-    //            {"文本3", "“对，罗峰师兄，能走到今天这一步，可完全是刻苦修炼。靠自己一拳一脚练出来的。哪像张昊白他们两个。”壮硕男生握紧拳头，深吸一口气，“我的目标就是罗峰师兄，我一定要在四年内，也就是大学毕业前，通过武馆考核，得到武馆的‘高级学员’称号！”"},
-    //            {"文本4", "“耳听为虚，眼见为实。哼哼，看到了吧？罗峰师兄和另外两个可不一样。”壮硕男生撇嘴道，“那个张昊白和柳婷，家里都是富豪。从小家里花了大量金钱去培养，才能有这么强。至于罗峰师兄，和他们可不同！”"}
-    //        };
-
-    //        //// 示例：对一整段对话进行编码（混合池化）
-    //        //string dialogue = "你好！最近怎么样？我想继续我们的冒险。";
-    //        //float[] convoVec = EncodeConversation(dialogue);
-    //        //ConsoleDebug.Log($"对话向量长度: {convoVec.Length}"); // 1536
-
-    //        // 单句编码测试
-    //        var embeddings = new Dictionary<string, float[]>();
-    //        foreach (var (key, text) in texts)
-    //        {
-    //            embeddings[key] = EncodeConversation(text);
-    //        }
-
-    //        // 打印几组文本之间的余弦相似度
-    //        ConsoleDebug.Log("\n🔑 文本语义相似度分析:");
-    //        ConsoleDebug.Log($"1 vs 2: {ComputeSimilarity(embeddings["文本1"], embeddings["文本2"]):F4}");
-    //        ConsoleDebug.Log($"1 vs 3: {ComputeSimilarity(embeddings["文本1"], embeddings["文本3"]):F4}");
-    //        ConsoleDebug.Log($"1 vs 4: {ComputeSimilarity(embeddings["文本1"], embeddings["文本4"]):F4}");
-    //        ConsoleDebug.Log($"3 vs 4: {ComputeSimilarity(embeddings["文本3"], embeddings["文本4"]):F4}");
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        ConsoleDebug.LogError($"测试失败: {ex.Message}");
-    //    }
-    //}
 
     // -------------------- 有用的工具方法 --------------------
 

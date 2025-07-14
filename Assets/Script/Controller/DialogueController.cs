@@ -1,8 +1,8 @@
 ﻿using System;
+using System.Buffers;
 using System.Linq;
 using System.Text;
 using UnityEngine;
-using static DialogueModel;
 
 /// <summary>
 /// 对话系统控制器（含网络异常处理）
@@ -11,49 +11,27 @@ using static DialogueModel;
 /// controller.SendMessage("你好");
 /// </example>
 /// </summary>
-[RequireComponent(typeof(DeepSeekManager))]
 public class DialogueController : SystemCtrlBase<DialogueController>, ISystemCtrl
 {
-    #region 配置区
-    [Header("API 配置")]
-    [SerializeField] private string apiKey = "your-api-key";
-    [SerializeField] private string apiEndpoint = "https://api.siliconflow.cn/v1/chat/completions";
-
-    [Header("对话设置")]
-    [Range(1, 20)]
-    [SerializeField] private int maxHistory = 5;
-    [SerializeField] private string modelName = "deepseek-ai/DeepSeek-V3";
-
-    [Header("流式设置")]
-    [SerializeField] private bool enableStreaming = true;
-    [SerializeField] private int dataTimeout = 30;
-
-    [Header("高级设置")]
-    [SerializeField] private int maxRetries = 2;
-    [SerializeField] private int maxTokenCount = 4000;
-    [Header("服务配置")]
-    [SerializeField] private int _maxRetries = 3;
-    [SerializeField] private DialogueView _view;
-    #endregion
+    private DialogueView _view;
+    public WindowUIType UIType => WindowUIType.DialogMain;
     public event Action<string> OnResponseReceived;
     public event Action<Exception> OnErrorOccurred;
-
     private DialogueModel _model;
-    private MemoryData memoryData; // 用于存储记忆数据
-    private DeepSeekManager _networkService;
-    private StringBuilder _aiResponseBuilder = new StringBuilder();
     public DialogueModel GetModel() => _model;
-
-    public  DialogueController()
+    private readonly IChatService _chat;
+    private readonly string _userColorHex;
+    private readonly string _aiColorHex;
+    private bool _isResponding;
+    private readonly StringBuilder _aiBuffer = new StringBuilder();
+    public DialogueController() { }
+    public DialogueController(IChatService chat)
     {
-        _model = new DialogueModel();//维护20条历史记录
-       // _networkService = gameObject.GetComponent<DeepSeekManager>();
-        memoryData = DataPersistenceManager.Instance.GetCurrentMemory();
-        InitializeNetworkService();
-        // 初始化事件绑定
+        _chat = chat;
+        _model = new DialogueModel();
         _view.OnSendMessage += HandleSendMessage;
-        OnResponseReceived += _view.HandleAIResponse; // 新增事件绑定
         _view.InitializeUI();
+        _isResponding = false;
     }
 
     private void HandleSendMessage(string message)
@@ -61,121 +39,78 @@ public class DialogueController : SystemCtrlBase<DialogueController>, ISystemCtr
         // 禁用UI输入
         _view.SetUIInteractable(false);
 
-        // 显示用户消息
-        _view.AppendCompleteMessage($"{message}", true);
+        // 追加用户消息（带色）
+        var coloredUser = $"<color=#{_userColorHex}>{message}</color>";
+        _view.AppendMessage(coloredUser, true);
 
         // 发送网络请求
-        HandleNetworkRequest(message);
+        _view.StartCoroutine(_chat.SendMessageCoroutine(message, chunk => ProcessChunk(chunk), HandleNetworkError));
     }
-
-    private void InitializeNetworkService()
-    {
-        _networkService.Initialize(apiKey, apiEndpoint, modelName, enableStreaming, dataTimeout);
-        _networkService.OnStreamingResponse += HandleStreamResponse;
-        _networkService.OnError += HandleNetworkError;
-    }
-
-    /// <summary>
-    /// 发送用户消息
-    /// <param name="message">需经过内容校验</param>
-    /// </summary>
-    public void HandleNetworkRequest(string message)
-    {
-        if (!ValidateMessage(message)) return;
-        // 添加用户 消息到模型
-        MemoryManager.Instance.AddConversationMemory(message, Role.User);// 添加到记忆
-        var recalls = MemoryManager.Instance.RetrieveRelevantMemories(message);// 检索相关记忆提示词
-
-        StringBuilder memoryContext = new StringBuilder();
-
-        foreach (var recatext in recalls)
-        {
-            // 添加角色标识符以保留来源信息
-            var rolePrefix = recatext.role == Role.User ? "[用户记忆] " : "[AI记忆] ";
-            // 添加记忆类型标识
-            var typeIdentifier = recatext.type switch
-            {
-                MemoryType.ShortTerm => "[短期]",
-                MemoryType.LongTerm => "[长期]",
-                MemoryType.Core => "[核心]",
-                _ => ""
-            };
-            memoryContext.Append(rolePrefix + typeIdentifier + recatext.content);
-        }
-
-        AddMessageToHistory(Role.User, message); // 添加用户消息到历史记录
-      //  StartCoroutine(_networkService.SendRequestCoroutine(message, memoryContext.ToString()));//历史消息
-
-    }
-
-    private bool ValidateMessage(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            OnErrorOccurred?.Invoke(new ArgumentException("消息内容不能为空"));
-            return false;
-        }
-        return true;
-    }
-
-    private void HandleStreamResponse(string chunk)
+    private void ProcessChunk(string chunk)
     {
         try
         {
+            // [REASONING]
             if (chunk.StartsWith("[REASONING]"))
             {
-                HandleReasoningContent(chunk.Substring(11));
+                var reasoning = chunk.Substring(11);
+                var colored = $"<color=#{_aiColorHex}>[分析]{reasoning}</color>";
+                _view.AppendMessage(colored, false);
                 return;
             }
+
+            // [END]
             if (chunk == "[END]")
             {
-                // 处理结束标记
-                MemoryManager.Instance.AddConversationMemory(_aiResponseBuilder.ToString(), Role.Assistant);// 添加到记忆
-                ConsoleDebug.Log("总输出消耗token:" + GameRoot.Instance.SentisInference.ComputeConversationTokenCount(_aiResponseBuilder.ToString()));
-                AddMessageToHistory(Role.Assistant, _aiResponseBuilder.ToString());
-                _aiResponseBuilder.Clear();
+                _isResponding = false;
+                _view.SetUIInteractable(true);
+                return;
+            }
+
+            // 首次响应
+            if (!_isResponding)
+            {
+                _isResponding = true;
+                _aiBuffer.Clear();
+                _aiBuffer.Append(chunk);
+                var colored = $"<color=#{_aiColorHex}>{chunk}</color>";
+                _view.AppendMessage(colored, false);
             }
             else
-                _aiResponseBuilder.Append(chunk);
-            OnResponseReceived?.Invoke(chunk);
+            {
+                // 累计响应
+                _aiBuffer.Append(chunk);
+                var colored = $"<color=#{_aiColorHex}>{_aiBuffer}</color>";
+                _view.UpdateLastMessage(colored);
+            }
         }
         catch (Exception ex)
         {
-            OnErrorOccurred?.Invoke(ex);
+            HandleNetworkError(ex);
         }
     }
-    private void AddMessageToHistory(Role role, string content)
-    {
-        var msg = new Message(role, content);
-        _model.AddMessage(msg);
-    }
-
-    // DialogueController.cs
-    private Message[] GetOptimizedHistory()
-    {
-        // 转换为API需要的格式
-        return _model.GetHistory().Select(m => new Message//构建新Message对象防止引用
-                                                          // 直接使用原Message对象可能导致数据不一致
-        (
-             m.role,
-            m.content
-            )).ToArray();
-    }
-
     private void HandleNetworkError(Exception ex)
     {
         Debug.LogError($"网络错误: {ex.Message}");
         OnErrorOccurred?.Invoke(ex);
     }
-
-    private void HandleReasoningContent(string reasoning)
+    /// <summary>
+    /// 打开对话视图
+    /// </summary>
+    public void OpenDialogueOnView()
     {
-        // 可扩展为独立事件
-        OnResponseReceived?.Invoke($"[分析] {reasoning}");
+        ServiceLocator.Container.GetService<IUIViewUtil>().LoadWindow(WindowUIType.DialogMain.ToString(), (GameObject obj) =>
+        {
+            _view = obj.GetComponent<DialogueView>();
+        });
     }
-
     public void OpenView(WindowUIType type)
     {
-        
+        switch (type)
+        {
+            case WindowUIType.DialogMain:
+                OpenDialogueOnView();
+                break;
+        }
     }
 }

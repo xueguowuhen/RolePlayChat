@@ -1,25 +1,22 @@
-﻿/****************************************************
-    文件：UIViewMgr
-	作者：无痕
-    邮箱: 1450411269@qq.com
-    日期：2024-07-17 15:36:24
-	功能：Nothing
-*****************************************************/
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-public class UIViewMgr : Singleton<UIViewMgr>
+public class UIViewMgr : IUIViewMgr
 {
-    private Dictionary<WindowUIType, ISystemCtrl> m_SystemCtrlDic = new Dictionary<WindowUIType, ISystemCtrl>();
-    public UIViewMgr()
+    private readonly Dictionary<WindowUIType, ISystemCtrl> _systemCtrlDic = new();
+
+    public UIViewMgr(IEnumerable<ISystemCtrl> controllers)
     {
-        m_SystemCtrlDic.Add(WindowUIType.DialogMain, DialogueController.Instance);
+        foreach (var ctrl in controllers)
+        {
+            _systemCtrlDic[ctrl.UIType] = ctrl;
+        }
     }
+
     public void OpenWindow(WindowUIType uiType)
     {
-        m_SystemCtrlDic[uiType].OpenView(uiType);
-        // AccountCtrl.Instance.OpenLogOnView();
+        if (_systemCtrlDic.TryGetValue(uiType, out var ctrl))
+            ctrl.OpenView(uiType);
+        else
+            ConsoleDebug.LogError($"UIViewMgr: 未注册窗口类型 {uiType}");
     }
 }

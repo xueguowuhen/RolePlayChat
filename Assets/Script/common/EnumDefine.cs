@@ -13,6 +13,8 @@ public enum WindowUIType
     /// </summary>
     DialogMain,
 
+    CustomWindow,
+
 }
 #endregion
 #region SceneType 场景类型

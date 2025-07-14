@@ -186,7 +186,7 @@ public class DeepSeekManager : MonoBehaviour
     private UnityWebRequest CreateStreamingRequest(string userInput, string memoryContext)
     {
         var request = new UnityWebRequest(_apiEndpoint, "POST");
-        ConsoleDebug.Log("总输入消耗token:" + GameRoot.Instance.SentisInference.ComputeConversationTokenCount(userInput + memoryContext + MemoryManager.Instance.Sysguize + MemoryManager.Instance.Sysjiyi).ToString());
+        //ConsoleDebug.Log("总输入消耗token:" + GameRoot.Instance.SentisInference.ComputeConversationTokenCount(userInput + memoryContext + MemoryManager.Instance.Sysguize + MemoryManager.Instance.Sysjiyi).ToString());
         ConsoleDebug.Log("历史记忆:"+memoryContext);
         var requestBody = new
         {

@@ -1,47 +1,47 @@
 using System;
+using System.Buffers;
 using UnityEngine;
 
-public class GameRoot : MonoBehaviour
+public class GameRoot
 {
     public static GameRoot Instance = null;
 
-    [Header("核心管理器")]
-    public DataPersistenceManager dataPersistenceManager;
-    public SentisInference SentisInference;
-    public MemoryManager memoryManager;               // 新增 MemoryManager 引用
-    public DialogueController dialogueController;
-    private void Awake()
+    private readonly DependencyContainer _container = new DependencyContainer();
+    public DependencyContainer Container => _container;
+    public void Initialize()
     {
-        // 单例赋值，保证只保留一个 GameRoot
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
+        // 1. 构建依赖关系
+        BuildDependencyContainer();
+        // 2. 初始化服务
+        InitializeServices();
+        // 3. 启动应用服务
+        StartApplication();
     }
-
-    private void Start()
+    private void BuildDependencyContainer()
     {
-        InitAllModules();
+        // 注册服务和控制器
+        _container.RegisterSingleton<IDataPersistenceManager, DataPersistenceManager>();
+        _container.RegisterSingleton<IMemoryManager, MemoryManager>();
+        _container.RegisterSingleton<ISentisInference, SentisInference>();
+        _container.RegisterSingleton<IResourcesManager, ResourcesMgr>();
+        _container.RegisterSingleton<IUIViewUtil, UIViewUtil>();
+        _container.RegisterSingleton<IUIViewMgr, UIViewMgr>();
+        _container.RegisterSingleton<IChatService, ChatService>();
+    //    _container.RegisterSingleton<IDialogueController, DialogueController>();
+       // _container.RegisterSingleton<ICustomizedController, CustomizedController>();
     }
-
-    /// <summary>
-    /// 按依赖顺序依次初始化各核心模块
-    /// </summary>
-    private void InitAllModules()
+    private void InitializeServices()
     {
-        // 1. 持久化服务初始化（加载历史对话、记忆数据等）
-        dataPersistenceManager.Init();
-
-        // 2. 文本编码器初始化（提供向量化服务）
-        SentisInference.Init();
-
-        // 3. 记忆管理器初始化（依赖 DataPersistenceManager 与 SentisInference）
-        memoryManager.Init();
-      
-        //进入对话界面
-        UIViewMgr.Instance.OpenWindow(WindowUIType.DialogMain);
+        _container.InitializeServices();
+    }
+    private void StartApplication()
+    {
+        // 启动主界面
+        var uiManager = _container.GetService<UIViewMgr>();
+        uiManager.OpenWindow(WindowUIType.DialogMain);
+    }
+    public void Shutdown()
+    {
+        // 如果有需要在退出时释放或保存数据的服务，在这里统一调用
     }
 }
